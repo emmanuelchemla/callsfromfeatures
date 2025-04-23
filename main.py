@@ -223,18 +223,19 @@ if __name__ == "__main__":
         for dnf2 in all_dnfs(N_FEATURES):
             A, B, AB, addition_vec, c1, c2, c4 = test_full(universe, dnf1, dnf2)
             results.append((c1, c2, c4))
+    total_cases = len(results)
     result_counts = Counter(results)
     print(
         f"Summary of unique result combinations (criteria 1, 2, 4) out of {len(results)} possibilities:"
     )
     for result, count in result_counts.items():
-        print(f"{result}: {count} occurrences")
+        print(f"{result}: {count} occurrences ({100*count/total_cases:.2f}%)")
 
 # For N_FEATURES = 3
 # Summary of unique result combinations (criteria 1, 2, 4) out of 65536 possibilities:
-# (False, None, None): 511 occurrences
-# (False, False, False): 1 occurrences
-# (True, None, None): 6050 occurrences
-# (True, False, True): 43591 occurrences
-# (False, False, True): 254 occurrences
-# (True, True, True): 15129 occurrences
+# (False, None, None): 511 occurrences (0.78%)
+# (False, False, False): 1 occurrences (0.00%)
+# (True, None, None): 6050 occurrences (9.23%)
+# (True, False, True): 43591 occurrences (66.51%)
+# (False, False, True): 254 occurrences (0.39%)
+# (True, True, True): 15129 occurrences (23.09%)
