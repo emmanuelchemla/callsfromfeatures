@@ -1,7 +1,9 @@
 from collections import Counter
 from dataclasses import dataclass
-from itertools import product, chain, combinations
+import itertools
 import numpy as np
+import pandas as pd
+import tqdm
 from typing import Callable, Optional
 
 
@@ -192,7 +194,9 @@ def test_full(A, B, AB):
 
 def powerset(iterable):
     s = list(iterable)
-    return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+    return itertools.chain.from_iterable(
+        itertools.combinations(s, r) for r in range(len(s) + 1)
+    )
 
 
 def world_to_clause(world):
@@ -204,7 +208,7 @@ def all_dnfs(n_features):
     Yield all possible DNFs over n_features as lists of clauses.
     Each clause corresponds to a world (input) where the function is true.
     """
-    worlds = list(product([0, 1], repeat=n_features))
+    worlds = list(itertools.product([0, 1], repeat=n_features))
     for true_set in powerset(worlds):
         if not true_set:
             yield []  # Always false
@@ -212,63 +216,87 @@ def all_dnfs(n_features):
             yield [world_to_clause(w) for w in true_set]
 
 
+def format_worlds(worlds):
+    return ", ".join("".join(str(bit) for bit in row) for row in worlds)
+
+
+def test_all_meanings(N_FEATURES, probabilities):
+    universe = get_universe(N_FEATURES, probabilities)
+
+    results = []
+
+    dnfs = list(all_dnfs(N_FEATURES))
+
+    for dnf1, dnf2 in tqdm.tqdm(
+        itertools.product(dnfs, repeat=2),
+        total=len(dnfs) ** 2,
+        desc="Testing all DNF pairs",
+    ):
+        A, B, AB = calls_from_DNF(universe, dnf1, dnf2)
+        A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
+        results.append(
+            {
+                "exhaustification": "no exh",
+                "criterion 1": c1,
+                "criterion 2": c2,
+                "criterion 4": c4,
+                "A": format_worlds(A.worlds),
+                "B": format_worlds(B.worlds),
+                "A&B": format_worlds(AB.worlds),
+                "A+B": format_worlds(addition_vec.worlds),
+            }
+        )
+
+        A_exh, B_exh = exh_calls(A, B)
+        A_exh, B_exh, AB, addition_vec, c1, c2, c4 = test_full(A_exh, B_exh, AB)
+        results.append(
+            {
+                "exhaustification": "exh",
+                "criterion 1": c1,
+                "criterion 2": c2,
+                "criterion 4": c4,
+                "A": format_worlds(A.worlds),
+                "B": format_worlds(B.worlds),
+                "A&B": format_worlds(AB.worlds),
+                "A+B": format_worlds(addition_vec.worlds),
+            }
+        )
+
+    results = pd.DataFrame(results)
+    total_cases = len(results) / 2
+    summary = (
+        results.groupby(
+            ["exhaustification", "criterion 1", "criterion 2", "criterion 4"],
+            dropna=False,
+        )
+        .size()
+        .reset_index(name="count")
+    )
+    summary["percentage"] = summary["count"] / total_cases * 100
+
+    return results, summary
+
+
 if __name__ == "__main__":
 
-    N_FEATURES = 3
-    # probabilities = np.array([1/10, 1/5, 1/2])
-    # universe = get_universe(N_FEATURES, probabilities)
-    universe = get_universe(N_FEATURES, None)
+    N_FEATURES = 2
+    probabilities = None
+    # probabilities = np.array([1/250, 1/50, 1/10, 1/2])
+    universe = get_universe(N_FEATURES, probabilities)
 
-    # Simple test:
+    # Specific tests
     A, B, AB = calls_from_DNF(universe, [[(0, True)]], [[(1, True)]])
     test_full(A, B, AB)
     A_exh, B_exh = exh_calls(A, B)
     test_full(A_exh, B_exh, AB)
 
-    # Test all combinations
-    results = []
+    # All meanings
+    results, summary = test_all_meanings(N_FEATURES, None)
+    trivially_compositional = results[
+        (results["criterion 1"] == True)
+        & (results["criterion 2"] == True)
+        & (results["criterion 4"] == False)
+    ][["exhaustification", "A", "B", "A&B", "A+B"]]
 
-    for dnf1 in all_dnfs(N_FEATURES):
-        for dnf2 in all_dnfs(N_FEATURES):
-            A, B, AB = calls_from_DNF(universe, dnf1, dnf2)
-            A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
-            results.append(("no exh", c1, c2, c4))
-
-            if c1 and c2 and (not (c4)):
-                print(f"no exh: A={A.worlds}, B={B.worlds}")
-
-            A_exh, B_exh = exh_calls(A, B)
-            A, B, AB, addition_vec, c1, c2, c4 = test_full(A_exh, B_exh, AB)
-            results.append(("exh", c1, c2, c4))
-            if c1 and c2 and (not (c4)):
-                print(f"exh: A={A.worlds}, B={B.worlds}")
-
-    total_cases = len(results)
-    result_counts = Counter(results)
-    sorted_results = sorted(
-        result_counts.items(),
-        key=lambda item: tuple((v if v is not None else False) for v in item[0]),
-    )
-
-    print(
-        f"Summary of unique result combinations (criteria 1, 2, 4) out of {len(results)} possibilities:"
-    )
-    for result, count in sorted_results:
-        print(f"{result}: {count} occurrences ({100 * count / total_cases:.2f}%)")
-
-# For N_FEATURES = 3
-# Summary of unique result combinations (criteria 1, 2, 4) out of 13,1072 possibilities:
-# ('exh', False, None, None): 511 occurrences (0.39%)
-# ('exh', False, False, False): 6305 occurrences (4.81%)
-# ('exh', False, True, False): 6050 occurrences (4.62%)
-# ('exh', True, None, None): 6050 occurrences (4.62%)
-# ('exh', True, False, True): 96 occurrences (0.07%)
-# ('exh', True, True, False): 32 occurrences (0.02%)
-# ('exh', True, True, True): 46492 occurrences (35.47%)
-# ('no exh', False, None, None): 511 occurrences (0.39%)
-# ('no exh', False, False, False): 1 occurrences (0.00%)
-# ('no exh', False, False, True): 229 occurrences (0.17%)
-# ('no exh', False, True, True): 25 occurrences (0.02%)
-# ('no exh', True, None, None): 6050 occurrences (4.62%)
-# ('no exh', True, False, True): 43591 occurrences (33.26%)
-# ('no exh', True, True, True): 15129 occurrences (11.54%)
+    summary
+    trivially_compositional
