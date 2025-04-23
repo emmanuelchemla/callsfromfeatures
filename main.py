@@ -214,7 +214,7 @@ def all_dnfs(n_features):
 
 if __name__ == "__main__":
 
-    N_FEATURES = 2
+    N_FEATURES = 3
     # probabilities = np.array([1/10, 1/5, 1/2])
     # universe = get_universe(N_FEATURES, probabilities)
     universe = get_universe(N_FEATURES, None)
@@ -234,23 +234,41 @@ if __name__ == "__main__":
             A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
             results.append(("no exh", c1, c2, c4))
 
+            if c1 and c2 and (not (c4)):
+                print(f"no exh: A={A.worlds}, B={B.worlds}")
+
             A_exh, B_exh = exh_calls(A, B)
             A, B, AB, addition_vec, c1, c2, c4 = test_full(A_exh, B_exh, AB)
             results.append(("exh", c1, c2, c4))
+            if c1 and c2 and (not (c4)):
+                print(f"exh: A={A.worlds}, B={B.worlds}")
 
     total_cases = len(results)
     result_counts = Counter(results)
+    sorted_results = sorted(
+        result_counts.items(),
+        key=lambda item: tuple((v if v is not None else False) for v in item[0]),
+    )
+
     print(
         f"Summary of unique result combinations (criteria 1, 2, 4) out of {len(results)} possibilities:"
     )
-    for result, count in result_counts.items():
-        print(f"{result}: {count} occurrences ({100*count/total_cases:.2f}%)")
+    for result, count in sorted_results:
+        print(f"{result}: {count} occurrences ({100 * count / total_cases:.2f}%)")
 
 # For N_FEATURES = 3
-# Summary of unique result combinations (criteria 1, 2, 4) out of 65536 possibilities:
-# (False, None, None): 511 occurrences (0.78%)
-# (False, False, False): 1 occurrences (0.00%)
-# (True, None, None): 6050 occurrences (9.23%)
-# (True, False, True): 43591 occurrences (66.51%)
-# (False, False, True): 254 occurrences (0.39%)
-# (True, True, True): 15129 occurrences (23.09%)
+# Summary of unique result combinations (criteria 1, 2, 4) out of 13,1072 possibilities:
+# ('exh', False, None, None): 511 occurrences (0.39%)
+# ('exh', False, False, False): 6305 occurrences (4.81%)
+# ('exh', False, True, False): 6050 occurrences (4.62%)
+# ('exh', True, None, None): 6050 occurrences (4.62%)
+# ('exh', True, False, True): 96 occurrences (0.07%)
+# ('exh', True, True, False): 32 occurrences (0.02%)
+# ('exh', True, True, True): 46492 occurrences (35.47%)
+# ('no exh', False, None, None): 511 occurrences (0.39%)
+# ('no exh', False, False, False): 1 occurrences (0.00%)
+# ('no exh', False, False, True): 229 occurrences (0.17%)
+# ('no exh', False, True, True): 25 occurrences (0.02%)
+# ('no exh', True, None, None): 6050 occurrences (4.62%)
+# ('no exh', True, False, True): 43591 occurrences (33.26%)
+# ('no exh', True, True, True): 15129 occurrences (11.54%)
