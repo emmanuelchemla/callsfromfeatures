@@ -13,11 +13,6 @@ class Call:
     chance: Optional[float] = None
 
 
-def calculate_chance(call):
-    call.chance = get_distance(call, call)
-    return call
-
-
 def get_universe(n_features, probabilities):
     if probabilities is None:
         probabilities = np.ones(n_features) * 0.5
@@ -28,15 +23,27 @@ def get_universe(n_features, probabilities):
     probas = np.prod(
         worlds * probabilities + (1 - worlds) * (1 - probabilities), axis=1
     )
-    return Call(worlds=worlds, probas=probas)
+
+    def meaning(x):
+        return True
+
+    result = Call(worlds=worlds, probas=probas, meaning=meaning)
+    result.chance = get_distance(result, result)
+
+    return result
 
 
-def get_worlds(universe, meaning):
-    mask = np.array([meaning(world) for world in universe.worlds])
-    call_worlds = universe.worlds[mask]
-    call_probas = universe.probas[mask]
+def filter_call(source_call, meaning):
+    if len(source_call.worlds) < 1:
+        return source_call
+    mask = np.array([meaning(world) for world in source_call.worlds])
+    call_worlds = source_call.worlds[mask]
+    call_probas = source_call.probas[mask]
     call_probas = normalize_probas(call_probas)
-    return call_worlds, call_probas
+    result = Call(worlds=call_worlds, probas=call_probas, meaning=meaning)
+    result.chance = get_distance(result, result)
+
+    return result
 
 
 def normalize_probas(probas):
@@ -46,13 +53,13 @@ def normalize_probas(probas):
     return probas
 
 
-def make_meaning_from_DNF(dnf):
-    all_cases = [make_meaning_from_case(case) for case in dnf]
-    disjunction = make_disjunction_meaning(all_cases)
+def get_meaning_from_DNF(dnf):
+    all_cases = [get_meaning_from_case(case) for case in dnf]
+    disjunction = get_disjunction(all_cases)
     return disjunction
 
 
-def make_meaning_from_case(dnf_case):
+def get_meaning_from_case(dnf_case):
     def meaning(vec):
         return all(
             (vec[i] == 1) if polarity else (vec[i] == 0) for i, polarity in dnf_case
@@ -61,29 +68,25 @@ def make_meaning_from_case(dnf_case):
     return meaning
 
 
-def make_disjunction_meaning(meanings):
+def get_disjunction(meanings):
     def meaning(vec):
         return any(m(vec) for m in meanings)
 
     return meaning
 
 
-def make_conjunction_meaning(meanings):
+def get_conjunction(meanings):
     def meaning(vec):
         return all(m(vec) for m in meanings)
 
     return meaning
 
 
-def make_negation_meaning(meaning):
-    def meaning(vec):
+def get_negation(meaning):
+    def neg_meaning(vec):
         return not (meaning(vec))
 
-    return meaning
-
-
-def make_conjunction_dnf(dnf1, dnf2):
-    return [sorted(set(clause1) | set(clause2)) for clause1 in dnf1 for clause2 in dnf2]
+    return neg_meaning
 
 
 def add_calls(call1, call2):
@@ -121,14 +124,16 @@ def get_distance(call1, call2):
     return expected_distance
 
 
-def make_feature_call(universe: Call, dnf: list[list[int]]) -> Call:
-
-    meaning = make_meaning_from_DNF(dnf)
-    worlds, probas = get_worlds(universe, meaning)
-    result = Call(meaning=meaning, worlds=worlds, probas=probas)
-    result.chance = get_distance(result, result)
-
+def get_call_from_DNF(universe: Call, dnf: list[list[int]]) -> Call:
+    meaning = get_meaning_from_DNF(dnf)
+    result = filter_call(universe, meaning)
     return result
+
+
+def exh_calls(call1, call2):
+    call1_exh = filter_call(call1, get_negation(call2.meaning))
+    call2_exh = filter_call(call2, get_negation(call1.meaning))
+    return call1_exh, call2_exh
 
 
 def test_criterion_1(A, B):
@@ -165,18 +170,19 @@ def test_criterion_4(A, B, AB, addition_vec):
         return False, f"❌ (iv) d(AB, A+B) ({d_comp:.2f}) > chance ({mean_chance:.2f})"
 
 
-def test_full(universe, A_dnf, B_dnf):
-    A = make_feature_call(universe, A_dnf)
-    B = make_feature_call(universe, B_dnf)
+def calls_from_DNF(universe, A_dnf, B_dnf):
+    A = get_call_from_DNF(universe, A_dnf)
+    B = get_call_from_DNF(universe, B_dnf)
+    AB = filter_call(A, B.meaning)
+    return A, B, AB
+
+
+def test_full(A, B, AB):
     criterion_1, _ = test_criterion_1(A, B)
-    AB_dnf = make_conjunction_dnf(A_dnf, B_dnf)
-    AB = make_feature_call(universe, AB_dnf)
     addition_vec = add_calls(A, B)
     if len(AB.worlds) > 0:
         criterion_2, _ = test_criterion_2(A, B, AB)
-        # criterion_3 = test_criterion_3(A, B, AB, addition_vec)
         criterion_4, _ = test_criterion_4(A, B, AB, addition_vec)
-
     else:
         criterion_2 = None
         criterion_4 = None
@@ -208,21 +214,30 @@ def all_dnfs(n_features):
 
 if __name__ == "__main__":
 
-    N_FEATURES = 3
+    N_FEATURES = 2
     # probabilities = np.array([1/10, 1/5, 1/2])
     # universe = get_universe(N_FEATURES, probabilities)
     universe = get_universe(N_FEATURES, None)
 
     # Simple test:
-    test_full(universe, [[(0, True)]], [[(1, True)]])
+    A, B, AB = calls_from_DNF(universe, [[(0, True)]], [[(1, True)]])
+    test_full(A, B, AB)
+    A_exh, B_exh = exh_calls(A, B)
+    test_full(A_exh, B_exh, AB)
 
     # Test all combinations
     results = []
 
     for dnf1 in all_dnfs(N_FEATURES):
         for dnf2 in all_dnfs(N_FEATURES):
-            A, B, AB, addition_vec, c1, c2, c4 = test_full(universe, dnf1, dnf2)
-            results.append((c1, c2, c4))
+            A, B, AB = calls_from_DNF(universe, dnf1, dnf2)
+            A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
+            results.append(("no exh", c1, c2, c4))
+
+            A_exh, B_exh = exh_calls(A, B)
+            A, B, AB, addition_vec, c1, c2, c4 = test_full(A_exh, B_exh, AB)
+            results.append(("exh", c1, c2, c4))
+
     total_cases = len(results)
     result_counts = Counter(results)
     print(
