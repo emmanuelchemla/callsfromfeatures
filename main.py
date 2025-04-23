@@ -126,12 +126,6 @@ def get_distance(call1, call2):
     return expected_distance
 
 
-def get_call_from_DNF(universe: Call, dnf: list[list[int]]) -> Call:
-    meaning = get_meaning_from_DNF(dnf)
-    result = filter_call(universe, meaning)
-    return result
-
-
 def exh_calls(call1, call2):
     call1_exh = filter_call(call1, get_negation(call2.meaning))
     call2_exh = filter_call(call2, get_negation(call1.meaning))
@@ -172,13 +166,6 @@ def test_criterion_4(A, B, AB, addition_vec):
         return False, f"❌ (iv) d(AB, A+B) ({d_comp:.2f}) > chance ({mean_chance:.2f})"
 
 
-def calls_from_DNF(universe, A_dnf, B_dnf):
-    A = get_call_from_DNF(universe, A_dnf)
-    B = get_call_from_DNF(universe, B_dnf)
-    AB = filter_call(A, B.meaning)
-    return A, B, AB
-
-
 def test_full(A, B, AB):
     criterion_1, _ = test_criterion_1(A, B)
     addition_vec = add_calls(A, B)
@@ -192,28 +179,24 @@ def test_full(A, B, AB):
     return A, B, AB, addition_vec, criterion_1, criterion_2, criterion_4
 
 
-def powerset(iterable):
-    s = list(iterable)
-    return itertools.chain.from_iterable(
-        itertools.combinations(s, r) for r in range(len(s) + 1)
-    )
+def calls_from_meanings(universe, meaning1, meaning2):
+    A = filter_call(universe, meaning1)
+    B = filter_call(universe, meaning2)
+    AB = filter_call(A, B.meaning)
+    return A, B, AB
 
 
-def world_to_clause(world):
-    return [(i, bool(bit)) for i, bit in enumerate(world)]
+def get_all_meanings(N_FEATURES):
+    universe = get_universe(N_FEATURES, None)
+    worlds = [tuple(world) for world in universe.worlds]  # make hashable
 
+    for truth_values in itertools.product([False, True], repeat=len(worlds)):
+        world_to_truth = dict(zip(worlds, truth_values))
 
-def all_dnfs(n_features):
-    """
-    Yield all possible DNFs over n_features as lists of clauses.
-    Each clause corresponds to a world (input) where the function is true.
-    """
-    worlds = list(itertools.product([0, 1], repeat=n_features))
-    for true_set in powerset(worlds):
-        if not true_set:
-            yield []  # Always false
-        else:
-            yield [world_to_clause(w) for w in true_set]
+        def meaning(vec, _map=world_to_truth):
+            return _map[tuple(vec)]
+
+        yield meaning
 
 
 def format_worlds(worlds):
@@ -225,14 +208,14 @@ def test_all_meanings(N_FEATURES, probabilities):
 
     results = []
 
-    dnfs = list(all_dnfs(N_FEATURES))
+    all_meanings = list(get_all_meanings(N_FEATURES))
 
-    for dnf1, dnf2 in tqdm.tqdm(
-        itertools.product(dnfs, repeat=2),
-        total=len(dnfs) ** 2,
-        desc="Testing all DNF pairs",
+    for meaning1, meaning2 in tqdm.tqdm(
+        itertools.product(all_meanings, repeat=2),
+        total=len(all_meanings) ** 2,
+        desc="Testing all meaning pairs",
     ):
-        A, B, AB = calls_from_DNF(universe, dnf1, dnf2)
+        A, B, AB = calls_from_meanings(universe, meaning1, meaning2)
         A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
         results.append(
             {
@@ -279,13 +262,15 @@ def test_all_meanings(N_FEATURES, probabilities):
 
 if __name__ == "__main__":
 
-    N_FEATURES = 2
+    N_FEATURES = 3
     probabilities = None
     # probabilities = np.array([1/250, 1/50, 1/10, 1/2])
     universe = get_universe(N_FEATURES, probabilities)
 
     # Specific tests
-    A, B, AB = calls_from_DNF(universe, [[(0, True)]], [[(1, True)]])
+    meaning1 = get_meaning_from_DNF([[(0, True)]])
+    meaning2 = get_meaning_from_DNF([[(1, True)]])
+    A, B, AB = calls_from_meanings(universe, meaning1, meaning2)
     test_full(A, B, AB)
     A_exh, B_exh = exh_calls(A, B)
     test_full(A_exh, B_exh, AB)
