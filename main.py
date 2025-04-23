@@ -229,3 +229,12 @@ if __name__ == "__main__":
     )
     for result, count in result_counts.items():
         print(f"{result}: {count} occurrences")
+
+# For N_FEATURES = 3
+# Summary of unique result combinations (criteria 1, 2, 4) out of 65536 possibilities:
+# (False, None, None): 511 occurrences
+# (False, False, False): 1 occurrences
+# (True, None, None): 6050 occurrences
+# (True, False, True): 43591 occurrences
+# (False, False, True): 254 occurrences
+# (True, True, True): 15129 occurrences
