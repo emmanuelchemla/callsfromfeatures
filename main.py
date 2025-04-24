@@ -218,7 +218,7 @@ def test_all_meanings(N_FEATURES, probabilities):
         A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
         results.append(
             {
-                "exhaustification": "no exh",
+                "exhaustification": "no exhaustification",
                 "criterion 1": c1,
                 "criterion 2": c2,
                 "criterion 4": c4,
@@ -233,7 +233,7 @@ def test_all_meanings(N_FEATURES, probabilities):
         A_exh, B_exh, AB, addition_vec, c1, c2, c4 = test_full(A_exh, B_exh, AB)
         results.append(
             {
-                "exhaustification": "exh",
+                "exhaustification": "exhaustification",
                 "criterion 1": c1,
                 "criterion 2": c2,
                 "criterion 4": c4,
