@@ -141,6 +141,9 @@ def test_criterion_1(A, B):
 
 
 def test_criterion_2(A, B, AB):
+    if len(AB.worlds) < 1:
+        return None, "not applicable (empty conjunction)"
+
     d_AB_A = get_distance(AB, A)
     d_AB_B = get_distance(AB, A)
     if d_AB_A > A.chance and d_AB_B > B.chance:
@@ -156,8 +159,10 @@ def test_criterion_2(A, B, AB):
         )
 
 
-def test_criterion_4(A, B, AB, addition_vec):
-    d_comp = get_distance(AB, addition_vec)
+def test_criterion_4(A, B, AB, addition_vector):
+    if len(AB.worlds) < 1:
+        return None, "not applicable (empty conjunction)"
+    d_comp = get_distance(AB, addition_vector)
     mean_chance = (A.chance + B.chance) / 2
     if d_comp > mean_chance:
         return True, f"✅ (iv) d(AB, A+B) ({d_comp:.2f}) > chance ({mean_chance:.2f})"
@@ -166,16 +171,12 @@ def test_criterion_4(A, B, AB, addition_vec):
 
 
 def test_full(A, B, AB):
+    addition_vector = add_calls(A, B)
     criterion_1, _ = test_criterion_1(A, B)
-    addition_vec = add_calls(A, B)
-    if len(AB.worlds) > 0:
-        criterion_2, _ = test_criterion_2(A, B, AB)
-        criterion_4, _ = test_criterion_4(A, B, AB, addition_vec)
-    else:
-        criterion_2 = None
-        criterion_4 = None
+    criterion_2, _ = test_criterion_2(A, B, AB)
+    criterion_4, _ = test_criterion_4(A, B, AB, addition_vector)
 
-    return A, B, AB, addition_vec, criterion_1, criterion_2, criterion_4
+    return A, B, AB, addition_vector, criterion_1, criterion_2, criterion_4
 
 
 def calls_from_meanings(universe, meaning1, meaning2):
@@ -215,7 +216,7 @@ def test_all_meanings(N_FEATURES, probabilities):
         desc="Testing all meaning pairs",
     ):
         A, B, AB = calls_from_meanings(universe, meaning1, meaning2)
-        A, B, AB, addition_vec, c1, c2, c4 = test_full(A, B, AB)
+        A, B, AB, addition_vector, c1, c2, c4 = test_full(A, B, AB)
         results.append(
             {
                 "exhaustification": "no exhaustification",
@@ -225,12 +226,12 @@ def test_all_meanings(N_FEATURES, probabilities):
                 "A": format_worlds(A.worlds),
                 "B": format_worlds(B.worlds),
                 "A&B": format_worlds(AB.worlds),
-                "A+B": format_worlds(addition_vec.worlds),
+                "A+B": format_worlds(addition_vector.worlds),
             }
         )
 
         A_exh, B_exh = exh_calls(A, B)
-        A_exh, B_exh, AB, addition_vec, c1, c2, c4 = test_full(A_exh, B_exh, AB)
+        A_exh, B_exh, AB, addition_vector, c1, c2, c4 = test_full(A_exh, B_exh, AB)
         results.append(
             {
                 "exhaustification": "exhaustification",
@@ -240,7 +241,7 @@ def test_all_meanings(N_FEATURES, probabilities):
                 "A": format_worlds(A.worlds),
                 "B": format_worlds(B.worlds),
                 "A&B": format_worlds(AB.worlds),
-                "A+B": format_worlds(addition_vec.worlds),
+                "A+B": format_worlds(addition_vector.worlds),
             }
         )
 
