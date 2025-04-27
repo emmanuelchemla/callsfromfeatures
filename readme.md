@@ -27,6 +27,8 @@ Also, we use a different calculation of what is called chance value in the origi
 
 Results for 3 features are probably sufficient to get a sense of what would happen in higher dimensions, since there are only two critical calls at stake in each comparison. These results can be obtained by running `main.py`, and one of the two critical tables are reproduced here.
 
+A call recognized as trivially compositional (which they all are in this artificial setting, by construction) has values True, True, False. A call recognized as non-trivially compositional has values True, True, True.
+
 | exhaustification | criterion (i) | criterion (ii) | criterion (iv) | count | percentage |
 | ---------------- | ------------- | -------------- | -------------- | ----- | ---------- |
 | yes              | False         | NaN            | NaN            | 511   | 0.779724   |
